@@ -53,27 +53,27 @@ else
         --exclude='./.env' . ) | tar -C "$INSTALL_DIR" -xf -
 fi
 
-# .env: сохраняем серверный конфиг при обновлении; на первой установке
-# берём локальный .env, если он есть, иначе создаём из публичного шаблона.
+# .env: сохраняем серверный конфиг при обновлении. При первой установке
+# используем только публичный шаблон, никогда не копируя локальный .env из клона.
 if [ ! -f "$ENV_FILE" ]; then
-    if [ -f "$SRC_DIR/.env" ]; then
-        cp "$SRC_DIR/.env" "$ENV_FILE"
-    elif [ -f "$SRC_DIR/.env.example" ]; then
+    if [ -f "$SRC_DIR/.env.example" ]; then
         cp "$SRC_DIR/.env.example" "$ENV_FILE"
     else
-        die "не найден ни .env, ни .env.example"
+        die "не найден .env.example"
     fi
 fi
 
-# BOT_TOKEN обязателен; остальные параметры имеют безопасные значения по умолчанию.
-if ! grep -Eq '^BOT_TOKEN=.+$' "$ENV_FILE"; then
+# BOT_TOKEN — единственное обязательное значение; владелец определяется
+# автоматически из business_connection и сохраняется в SQLite.
+bot_token="$(sed -n 's/^BOT_TOKEN=//p' "$ENV_FILE" | head -n 1)"
+if [[ ! "$bot_token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
     [ -t 0 ] || die "в $ENV_FILE не заполнено: BOT_TOKEN; запустите установщик в интерактивном терминале"
-    printf '\nНастройка DialogSpy. Токен можно получить у @BotFather командой /newbot.\n'
+    printf '\nШаг 1 из 1 — токен Telegram-бота. Создайте бота через @BotFather → /newbot.\n'
     printf 'BOT_TOKEN (ввод скрыт): '
     IFS= read -r -s bot_token
     printf '\n'
     [ -n "$bot_token" ] || die "BOT_TOKEN не может быть пустым"
-    [[ "$bot_token" == *:* ]] || die "BOT_TOKEN должен быть вида 123456:ABC..."
+    [[ "$bot_token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || die "неверный формат BOT_TOKEN"
     if grep -q '^BOT_TOKEN=' "$ENV_FILE"; then
         sed -i "s|^BOT_TOKEN=.*|BOT_TOKEN=${bot_token}|" "$ENV_FILE"
     else
@@ -81,6 +81,7 @@ if ! grep -Eq '^BOT_TOKEN=.+$' "$ENV_FILE"; then
     fi
     unset bot_token
 fi
+unset bot_token
 
 log "Создаю системного пользователя $SERVICE_USER"
 if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then

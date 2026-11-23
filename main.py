@@ -8,6 +8,7 @@ from contextlib import suppress
 from logging.handlers import RotatingFileHandler
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramRetryAfter
 from aiogram.types import ErrorEvent
 
@@ -73,7 +74,8 @@ async def main() -> None:
     await db.connect()
     await handlers.configure(cfg, db)
 
-    bot = Bot(cfg.bot_token)
+    session = AiohttpSession(proxy=cfg.telegram_proxy) if cfg.telegram_proxy else None
+    bot = Bot(cfg.bot_token, session=session)
     dp = Dispatcher()
     dp.include_router(handlers.router)
     dp.errors.register(error_handler)

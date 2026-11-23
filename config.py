@@ -27,6 +27,7 @@ class Config:
     retention_days: int
     tz: str
     log_level: str
+    telegram_proxy: str | None
 
 
 def _parse_bool(name: str, value: str | None, default: bool) -> bool:
@@ -94,4 +95,5 @@ def load_config(env_file: str | Path = ".env") -> Config:
         retention_days=_parse_int("RETENTION_DAYS", os.getenv("RETENTION_DAYS"), 0),
         tz=tz,
         log_level=(os.getenv("LOG_LEVEL", "INFO").strip() or "INFO").upper(),
+        telegram_proxy=os.getenv("TELEGRAM_PROXY", "").strip() or None,
     )

@@ -1,0 +1,18 @@
+[Unit]
+Description=DialogSpy - архив сообщений Telegram Business
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Замените на своего пользователя и путь к проекту
+User=dialogspy
+# Group можно не указывать: systemd возьмёт основную группу пользователя.
+WorkingDirectory=/opt/dialogspy
+ExecStart=/opt/dialogspy/.venv/bin/python /opt/dialogspy/main.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

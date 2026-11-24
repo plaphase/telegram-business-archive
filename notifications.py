@@ -7,12 +7,13 @@ import html
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter
-from aiogram.types import LinkPreviewOptions
+from aiogram.types import FSInputFile, LinkPreviewOptions
 
 from config import Config
 
@@ -205,6 +206,19 @@ async def _send(bot: Bot, cfg: Config, target: NotifyTarget, text: str) -> None:
 
 async def notify_deleted(bot: Bot, cfg: Config, target: NotifyTarget, row: Any) -> None:
     text = _header("🗑 <b>Сообщение удалено</b>", row, cfg, target) + "\n\n" + _body(row)
+    media_path = row["media_path"]
+    if media_path and Path(media_path).is_file() and cfg.notify and target.chat_id is not None:
+        media = FSInputFile(media_path, filename=row["file_name"] or Path(media_path).name)
+        try:
+            if row["kind"] == "photo":
+                await bot.send_photo(target.chat_id, photo=media, caption=text, parse_mode="HTML")
+            elif row["kind"] == "video":
+                await bot.send_video(target.chat_id, video=media, caption=text, parse_mode="HTML")
+            else:
+                await bot.send_document(target.chat_id, document=media, caption=text, parse_mode="HTML")
+            return
+        except Exception:
+            logger.exception("Не удалось прикрепить файл к уведомлению об удалении")
     await _send(bot, cfg, target, text)
 
 

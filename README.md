@@ -57,14 +57,25 @@ id владельца и id личного чата с ботом — бот с�
 sudo apt update
 sudo apt install -y git python3 python3-venv
 mkdir -p ~/src
-cd ~/src
-git clone https://github.com/plaphase/telegram-business-archive.git
-cd telegram-business-archive
+git clone https://github.com/plaphase/telegram-business-archive.git ~/src/telegram-business-archive
+cd ~/src/telegram-business-archive
 sudo bash deploy/install.sh
 ```
 
-Каталог клона (`~/src/telegram-business-archive`) содержит исходники. Установщик копирует
-приложение в `/opt/dialogspy`, создаёт там виртуальное окружение и systemd-сервис.
+Команду установщика запускайте из каталога клона `~/src/telegram-business-archive`:
+скрипт берёт исходники относительно своего расположения и копирует приложение в
+`/opt/dialogspy`, где создаёт виртуальное окружение и systemd-сервис. Клон остаётся
+каталогом исходников; сервис работает из `/opt/dialogspy`. Для обновления сначала
+обновите клон, затем снова запустите установщик из него:
+
+```bash
+cd ~/src/telegram-business-archive
+git pull
+sudo bash deploy/install.sh
+```
+
+Команды обслуживания и просмотра файлов приложения выполняйте в `/opt/dialogspy`;
+например, логи доступны в `/opt/dialogspy/data/bot.log`.
 При первой установке он по шагам попросит только обязательный `BOT_TOKEN` (ввод скрыт).
 Получите его у @BotFather командой `/newbot`. Данные владельца вводить не нужно: бот
 сам получит их после подключения в Telegram. Токен не попадает в GitHub; серверный
@@ -73,12 +84,13 @@ sudo bash deploy/install.sh
 Можно задать другой каталог и имя системного пользователя перед запуском, например:
 
 ```bash
-sudo INSTALL_DIR=/opt/dialogspy SERVICE_USER=dialogspy bash deploy/install.sh
+sudo INSTALL_DIR=/srv/dialogspy SERVICE_USER=dialogspy bash deploy/install.sh
 ```
 
 При повторном запуске установщик обновляет файлы и перезапускает сервис, сохраняя
-существующий `/opt/dialogspy/.env` и архив данных. Локальный `.env` из каталога клона
-не копируется.
+существующий `.env` и архив данных в выбранном `INSTALL_DIR`. Локальный `.env` из
+каталога клона не копируется. Если используется нестандартный `INSTALL_DIR`, путь в
+systemd-командах и логах тоже будет нестандартным.
 ### Ручная установка
 
 ```bash

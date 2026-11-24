@@ -222,6 +222,26 @@ async def notify_deleted(bot: Bot, cfg: Config, target: NotifyTarget, row: Any) 
     await _send(bot, cfg, target, text)
 
 
+async def notify_captured_media(bot: Bot, cfg: Config, target: NotifyTarget, row: Any) -> None:
+    """Отправляет файл, полученный из ответа на самоуничтожающееся медиа."""
+    text = _header("📥 <b>Медиа из ответа сохранено</b>", row, cfg, target) + "\n\n" + _body(row)
+    media_path = row["media_path"]
+    if not cfg.notify or target.chat_id is None:
+        return
+    if not media_path or not Path(media_path).is_file():
+        await _send(bot, cfg, target, text + "\n\nФайл не удалось скачать на сервер.")
+        return
+    media = FSInputFile(media_path, filename=row["file_name"] or Path(media_path).name)
+    try:
+        if row["kind"] == "photo":
+            await bot.send_photo(target.chat_id, photo=media, caption=text, parse_mode="HTML")
+        else:
+            await bot.send_video(target.chat_id, video=media, caption=text, parse_mode="HTML")
+    except Exception:
+        logger.exception("Не удалось отправить медиа, полученное из reply_to_message")
+        await _send(bot, cfg, target, text)
+
+
 async def notify_edited(
     bot: Bot,
     cfg: Config,

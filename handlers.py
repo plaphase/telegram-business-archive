@@ -13,7 +13,7 @@ from aiogram.types import BusinessConnection, BusinessMessagesDeleted, Message
 
 from config import Config
 from db import Database
-from notifications import NotifyTarget, notify_connected, notify_deleted, notify_edited
+from notifications import NotifyTarget, notify_captured_media, notify_connected, notify_deleted, notify_edited
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ async def _download_media(bot: Bot, message: Message, info: dict[str, Any]) -> s
         return None
 
 
-async def _save_message(message: Message, bot: Bot) -> bool:
+async def _save_message(message: Message, bot: Bot, *, msg_id: int | None = None) -> bool:
     """Сохраняет копию сообщения в архив."""
     assert _cfg is not None and _db is not None
     info = _media_info(message)
@@ -137,7 +137,7 @@ async def _save_message(message: Message, bot: Bot) -> bool:
         {
             "chat_id": message.chat.id,
             "chat_title": _chat_title(message),
-            "msg_id": message.message_id,
+            "msg_id": msg_id if msg_id is not None else message.message_id,
             "sender_id": sender.id if sender else None,
             "sender_name": sender.full_name if sender else None,
             "sender_username": sender.username if sender else None,
@@ -201,6 +201,17 @@ async def on_business_message(message: Message, bot: Bot) -> None:
     if message.chat.id in _cfg.ignore_chats:
         return
     try:
+        # Replies may carry view-once media that was not delivered as a standalone update.
+        replied = message.reply_to_message
+        if replied is not None:
+            replied_info = _media_info(replied)
+            if replied_info.get("file_id") and replied_info["kind"] in {"photo", "video"}:
+                original_id = getattr(replied, "ephemeral_message_id", None) or replied.message_id
+                inserted = await _save_message(replied, bot, msg_id=original_id)
+                if inserted and _db is not None:
+                    saved = await _db.get_message(message.chat.id, original_id)
+                    if saved is not None:
+                        await notify_captured_media(bot, _cfg, _target, saved)
         await _save_message(message, bot)
     except Exception:
         logger.exception("Ошибка сохранения сообщения %s/%s", message.chat.id, message.message_id)

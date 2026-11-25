@@ -10,7 +10,14 @@ from typing import Any
 
 from aiogram import Bot, Router
 from aiogram.filters import CommandStart
-from aiogram.types import BusinessConnection, BusinessMessagesDeleted, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    BusinessConnection,
+    BusinessMessagesDeleted,
+    CopyTextButton,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from config import Config
 from db import Database
@@ -27,21 +34,33 @@ _target = NotifyTarget()
 
 
 @router.message(CommandStart())
-async def on_start(message: Message) -> None:
+async def on_start(message: Message, bot: Bot) -> None:
     """Короткая инструкция владельцу при первом открытии бота."""
+    me = await bot.get_me()
+    bot_username = f"@{me.username}" if me.username else ""
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="⚙️ Открыть настройки Telegram", url="tg://settings/business")]]
+        inline_keyboard=[
+            [InlineKeyboardButton(text="👤 Открыть мой профиль", url="tg://settings/my-profile")],
+            [
+                InlineKeyboardButton(
+                    text="📋 Скопировать имя бота",
+                    copy_text=CopyTextButton(text=bot_username or me.first_name),
+                )
+            ],
+        ]
     )
     await message.answer(
-        "Привет! Я DialogSpy — локальный архив твоих личных чатов Telegram Business.\n\n"
-        "Сохраняю новые сообщения и медиа, а при доступности события Telegram сообщаю об изменениях и удалениях. "
-        "Архив хранится на сервере, где установлен бот.\n\n"
-        "<b>Подключение:</b>\n"
-        "1. Открой настройки Telegram и выбери «Бизнес» → «Автоматизация чатов».\n"
-        "2. Добавь DialogSpy.\n"
+        "Привет! Я DialogSpy — архив новых сообщений из личных чатов Telegram Business.\n\n"
+        "Сохраняю новые сообщения и медиа. Если Telegram передаёт мне событие об изменении или удалении, "
+        "я сообщаю об этом. Архив хранится на сервере, где установлен бот.\n\n"
+        "<b>Подключение</b>\n"
+        "1. Открой свой профиль Telegram и нажми «Изменить».\n"
+        "2. Выбери «Автоматизация чатов» и добавь бота.\n"
         "3. Разреши доступ к нужным личным чатам.\n\n"
-        "После подключения я пришлю подтверждение. Историю до подключения Telegram не передаёт.",
+        "После подключения я пришлю подтверждение. Историю сообщений, отправленных до подключения, "
+        "Telegram боту не передаёт.",
         reply_markup=keyboard,
+        parse_mode="HTML",
     )
 
 

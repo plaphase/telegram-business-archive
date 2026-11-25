@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from aiogram import Bot, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     BusinessConnection,
     BusinessMessagesDeleted,
@@ -62,6 +62,12 @@ async def on_start(message: Message, bot: Bot) -> None:
         reply_markup=keyboard,
         parse_mode="HTML",
     )
+
+
+@router.message(Command("help"))
+async def on_help(message: Message, bot: Bot) -> None:
+    """Показывает ту же инструкцию из меню команд."""
+    await on_start(message, bot)
 
 
 async def configure(cfg: Config, db: Database) -> None:
@@ -316,4 +322,3 @@ async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot)
             logger.info("Помечено удалённым %s/%s", event.chat.id, msg_id)
         except Exception:
             logger.exception("Ошибка обработки удаления %s/%s", event.chat.id, msg_id)
-

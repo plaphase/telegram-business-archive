@@ -10,7 +10,7 @@ from logging.handlers import RotatingFileHandler
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramRetryAfter
-from aiogram.types import ErrorEvent
+from aiogram.types import BotCommand, ErrorEvent
 
 import handlers
 from config import Config, ConfigError, load_config
@@ -76,6 +76,12 @@ async def main() -> None:
 
     session = AiohttpSession(proxy=cfg.telegram_proxy) if cfg.telegram_proxy else None
     bot = Bot(cfg.bot_token, session=session)
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Запустить бота и открыть инструкцию"),
+            BotCommand(command="help", description="Показать инструкцию по подключению"),
+        ]
+    )
     dp = Dispatcher()
     dp.include_router(handlers.router)
     dp.errors.register(error_handler)

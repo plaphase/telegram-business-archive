@@ -40,7 +40,7 @@ async def on_start(message: Message, bot: Bot) -> None:
     bot_username = f"@{me.username}" if me.username else ""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="👤 Открыть мой профиль", url="tg://settings/my-profile")],
+            [InlineKeyboardButton(text="⚙️ Открыть настройки Telegram", url="tg://settings/")],
             [
                 InlineKeyboardButton(
                     text="📋 Скопировать имя бота",
@@ -316,3 +316,4 @@ async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot)
             logger.info("Помечено удалённым %s/%s", event.chat.id, msg_id)
         except Exception:
             logger.exception("Ошибка обработки удаления %s/%s", event.chat.id, msg_id)
+

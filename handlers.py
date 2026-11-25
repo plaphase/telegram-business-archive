@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from aiogram import Bot, Router
-from aiogram.types import BusinessConnection, BusinessMessagesDeleted, Message
+from aiogram.filters import CommandStart
+from aiogram.types import BusinessConnection, BusinessMessagesDeleted, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from config import Config
 from db import Database
@@ -23,6 +24,25 @@ _cfg: Config | None = None
 _db: Database | None = None
 # Куда слать уведомления; заполняется из .env и последнего business_connection.
 _target = NotifyTarget()
+
+
+@router.message(CommandStart())
+async def on_start(message: Message) -> None:
+    """Короткая инструкция владельцу при первом открытии бота."""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="⚙️ Открыть настройки Telegram", url="tg://settings/business")]]
+    )
+    await message.answer(
+        "Привет! Я DialogSpy — локальный архив твоих личных чатов Telegram Business.\n\n"
+        "Сохраняю новые сообщения и медиа, а при доступности события Telegram сообщаю об изменениях и удалениях. "
+        "Архив хранится на сервере, где установлен бот.\n\n"
+        "<b>Подключение:</b>\n"
+        "1. Открой настройки Telegram и выбери «Бизнес» → «Автоматизация чатов».\n"
+        "2. Добавь DialogSpy.\n"
+        "3. Разреши доступ к нужным личным чатам.\n\n"
+        "После подключения я пришлю подтверждение. Историю до подключения Telegram не передаёт.",
+        reply_markup=keyboard,
+    )
 
 
 async def configure(cfg: Config, db: Database) -> None:

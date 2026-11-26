@@ -63,12 +63,12 @@ if [ ! -f "$ENV_FILE" ]; then
     fi
 fi
 
-# BOT_TOKEN — единственное обязательное значение; владелец определяется
-# автоматически из business_connection и сохраняется в SQLite.
+# BOT_TOKEN и OWNER_ID обязательны: идентификатор владельца ограничивает бота
+# одним аккаунтом и проверяется для всех Business-событий.
 bot_token="$(sed -n 's/^BOT_TOKEN=//p' "$ENV_FILE" | head -n 1)"
 if [[ ! "$bot_token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
     [ -t 0 ] || die "в $ENV_FILE не заполнено: BOT_TOKEN; запустите установщик в интерактивном терминале"
-    printf '\nШаг 1 из 1 — токен Telegram-бота. Создайте бота через @BotFather → /newbot.\n'
+    printf '\nШаг 1 из 2 — токен Telegram-бота. Создайте бота через @BotFather → /newbot.\n'
     printf 'BOT_TOKEN (ввод скрыт): '
     IFS= read -r -s bot_token
     printf '\n'
@@ -82,6 +82,22 @@ if [[ ! "$bot_token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
     unset bot_token
 fi
 unset bot_token
+
+# OWNER_ID ограничивает Business-бота одним владельцем и нужен для безопасного старта.
+owner_id="$(sed -n 's/^OWNER_ID=//p' "$ENV_FILE" | head -n 1)"
+if [[ ! "$owner_id" =~ ^[1-9][0-9]*$ ]]; then
+    [ -t 0 ] || die "в $ENV_FILE не заполнено: OWNER_ID; задайте числовой Telegram ID владельца"
+    printf '\nШаг 2 из 2 — числовой Telegram ID владельца.\n'
+    printf 'OWNER_ID: '
+    IFS= read -r owner_id
+    [[ "$owner_id" =~ ^[1-9][0-9]*$ ]] || die "OWNER_ID должен быть положительным числовым Telegram ID"
+    if grep -q '^OWNER_ID=' "$ENV_FILE"; then
+        sed -i "s|^OWNER_ID=.*|OWNER_ID=${owner_id}|" "$ENV_FILE"
+    else
+        printf '\nOWNER_ID=%s\n' "$owner_id" >> "$ENV_FILE"
+    fi
+fi
+unset owner_id
 
 log "Создаю системного пользователя $SERVICE_USER"
 if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then

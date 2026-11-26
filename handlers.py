@@ -31,16 +31,21 @@ _cfg: Config | None = None
 _db: Database | None = None
 # Куда слать уведомления; заполняется из .env и последнего business_connection.
 _target = NotifyTarget()
+_connection_user_ids: dict[str, int] = {}
 
 
 @router.message(CommandStart())
 async def on_start(message: Message, bot: Bot) -> None:
     """Короткая инструкция владельцу при первом открытии бота."""
+    owner_id = _owner_user_id()
+    if message.from_user is None or owner_id is None or message.from_user.id != owner_id:
+        await message.answer("Этот бот доступен только владельцу.")
+        return
     me = await bot.get_me()
     bot_username = f"@{me.username}" if me.username else ""
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚙️ Открыть настройки Telegram", url="tg://settings/")],
+            [InlineKeyboardButton(text="👤 Открыть мой профиль Telegram", url="tg://settings/")],
             [
                 InlineKeyboardButton(
                     text="📋 Скопировать имя бота",
@@ -50,9 +55,8 @@ async def on_start(message: Message, bot: Bot) -> None:
         ]
     )
     await message.answer(
-        "Привет! Я DialogSpy — архив новых сообщений из личных чатов Telegram Business.\n\n"
-        "Сохраняю новые сообщения и медиа. Если Telegram передаёт мне событие об изменении или удалении, "
-        "я сообщаю об этом. Архив хранится на сервере, где установлен бот.\n\n"
+        "Привет! 👋 Этот бот будет сообщать тебе, если собеседник изменил или удалил сообщение, "
+        "а также медиа-файлы — это поможет не упустить важные детали и всегда быть в курсе происходящего\n\n"
         "<b>Подключение</b>\n"
         "1. Открой свой профиль Telegram и нажми «Изменить».\n"
         "2. Выбери «Автоматизация чатов» и добавь бота.\n"
@@ -86,6 +90,36 @@ async def configure(cfg: Config, db: Database) -> None:
     _target.name = row["user_name"] or _target.name
     _target.username = row["user_username"] or _target.username
     logger.info("Владелец из базы: %s (%s)", _target.username or "без username", _target.user_id)
+
+
+def _owner_user_id() -> int | None:
+    """OWNER_ID is authoritative; an existing owner connection is the fallback."""
+    if _cfg is not None and _cfg.owner_id is not None:
+        return _cfg.owner_id
+    return _target.user_id
+
+
+async def _is_owner_connection(bot: Bot, connection_id: str | None) -> bool:
+    """Fail closed unless the Business connection belongs to the configured owner."""
+    owner_id = _owner_user_id()
+    if owner_id is None or not connection_id:
+        logger.warning("Business event ignored: owner or business_connection_id is unknown")
+        return False
+
+    user_id = _connection_user_ids.get(connection_id)
+    if user_id is None:
+        try:
+            connection = await bot.get_business_connection(connection_id)
+        except Exception:
+            logger.exception("Could not resolve Business connection; ignoring event")
+            return False
+        user_id = connection.user.id
+        _connection_user_ids[connection_id] = user_id
+
+    if user_id != owner_id:
+        logger.warning("Ignoring Business connection for non-owner user_id=%s", user_id)
+        return False
+    return True
 
 
 def _iso(value: datetime | int | None = None) -> str:
@@ -215,6 +249,15 @@ async def on_business_connection(connection: BusinessConnection, bot: Bot) -> No
     if _cfg is None or _db is None:
         return
     user = connection.user
+    _connection_user_ids[connection.id] = user.id
+    owner_id = _owner_user_id()
+    if owner_id is None or user.id != owner_id:
+        logger.warning(
+            "Business connection ignored for user_id=%s; configured owner_id=%s",
+            user.id,
+            owner_id if owner_id is not None else "unset",
+        )
+        return
     try:
         await _db.record_connection(
             user.id,
@@ -243,6 +286,8 @@ async def on_business_message(message: Message, bot: Bot) -> None:
     """Новое сообщение в личном чате."""
     if _cfg is None:
         return
+    if not await _is_owner_connection(bot, message.business_connection_id):
+        return
     if message.chat.id in _cfg.ignore_chats:
         return
     try:
@@ -266,6 +311,8 @@ async def on_business_message(message: Message, bot: Bot) -> None:
 async def on_edited_business_message(message: Message, bot: Bot) -> None:
     """Сообщение отредактировано."""
     if _cfg is None or _db is None:
+        return
+    if not await _is_owner_connection(bot, message.business_connection_id):
         return
     if message.chat.id in _cfg.ignore_chats:
         return
@@ -307,6 +354,8 @@ async def on_edited_business_message(message: Message, bot: Bot) -> None:
 async def on_deleted_business_messages(event: BusinessMessagesDeleted, bot: Bot) -> None:
     """Сообщения удалены: помечаем в архиве и уведомляем."""
     if _cfg is None or _db is None:
+        return
+    if not await _is_owner_connection(bot, event.business_connection_id):
         return
     if event.chat.id in _cfg.ignore_chats:
         return

@@ -34,8 +34,9 @@ SQLite и systemd; архив остаётся на вашем сервере.
    username. Сохраните токен — он пойдёт в `BOT_TOKEN`.
 2. В BotFather: `/mybots` → выберите бота → **Bot Settings** → включите
    **Business Mode** (в интерфейсе может называться Secretary Mode).
-3. `OWNER_ID` и `OWNER_USERNAME` указывать не нужно: бот получает владельца и id
-   личного чата из `business_connection` и сохраняет их в SQLite.
+3. Укажите числовой `OWNER_ID` при установке. Он ограничивает использование ботом
+   только вашего аккаунта; чужие подключения и события игнорируются. `OWNER_USERNAME`
+   можно не задавать: имя бот получает из `business_connection`.
 
 ## 2. Подключение к аккаунту
 
@@ -76,10 +77,10 @@ sudo bash deploy/install.sh
 
 Команды обслуживания и просмотра файлов приложения выполняйте в `/opt/dialogspy`;
 например, логи доступны в `/opt/dialogspy/data/bot.log`.
-При первой установке он по шагам попросит только обязательный `BOT_TOKEN` (ввод скрыт).
-Получите его у @BotFather командой `/newbot`. Данные владельца вводить не нужно: бот
-сам получит их после подключения в Telegram. Токен не попадает в GitHub; серверный
-`/opt/dialogspy/.env` закрыт правами доступа.
+При первой установке установщик по шагам запросит `BOT_TOKEN` (ввод скрыт) и числовой
+`OWNER_ID`. Получите токен у @BotFather командой `/newbot`, а свой Telegram ID — через
+надёжный способ просмотра user ID. Токен и ID хранятся только в серверном `.env` и не
+попадают в GitHub; файл `/opt/dialogspy/.env` закрыт правами доступа.
 
 Можно задать другой каталог и имя системного пользователя перед запуском, например:
 
@@ -100,7 +101,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-nano .env                 # заполните BOT_TOKEN на сервере
+nano .env                 # заполните BOT_TOKEN и числовой OWNER_ID
 python main.py            # проверка запуска; остановка — Ctrl+C
 ```
 
@@ -259,6 +260,37 @@ sudo systemctl start dialogspy
 - `.env`, `.cloud-attachments/`, `.freebuff/`, `data/`, журналы и базы исключены через `.gitignore` и не публикуются в репозитории.
 - Бот не отвечает в чатах и не меняет их содержимое.
 
+## 9. Проверка Browserless (Playwright)
+
+Необязательный пример: Playwright подключается к управляемому браузеру Browserless по CDP.
+Боту он не нужен — это отдельный скрипт, который проверяет, что Browserless отвечает.
+
+1. Зарегистрируйтесь на [browserless.io](https://browserless.io/) и скопируйте API-токен
+   со страницы [account](https://browserless.io/account/).
+2. Впишите его в `.env` рядом с `BOT_TOKEN`:
+
+   ```
+   BROWSERLESS_TOKEN=ваш_токен
+   ```
+
+3. Запустите скрипт (Playwright ставится один раз вместе с зависимостями):
+
+   ```bash
+   pip install -r requirements.txt
+   python browserless_check.py
+   ```
+
+   При автоматической установке зависимости уже стоят в venv сервиса:
+   `sudo /opt/dialogspy/.venv/bin/python /opt/dialogspy/browserless_check.py`.
+   Файл `.env` скрипт ищет рядом с собой, поэтому запускать можно из любого каталога.
+
+Скрипт открывает `https://example.com/` в браузере Browserless и печатает заголовок:
+`Browserless ответил, заголовок страницы: Example Domain`. При ошибке он печатает причину
+(токен в выводе скрыт) и завершается с кодом 1. Локальный Chromium не нужен: браузер
+работает на стороне Browserless. Адрес по умолчанию —
+`wss://production-sfo.browserless.io`; для европейского региона поменяйте константу
+`BROWSERLESS_URL` в `browserless_check.py`.
+
 ## Структура проекта
 
 ```
@@ -267,7 +299,8 @@ config.py               чтение .env и проверка настроек
 db.py                   SQLite (aiosqlite, WAL, схема)
 handlers.py             бизнес-события Telegram
 notifications.py        HTML-уведомления в личку
-requirements.txt        aiogram, aiosqlite, python-dotenv
+browserless_check.py     пример подключения Playwright к Browserless
+requirements.txt        aiogram, aiosqlite, python-dotenv, playwright
 .env.example            шаблон настроек
 deploy/dialogspy.service  systemd-юнит
 ```

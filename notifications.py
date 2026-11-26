@@ -163,16 +163,28 @@ def _body(row: Any) -> str:
     return " · ".join(parts)
 
 
-def _header(title: str, row: Any, cfg: Config, target: NotifyTarget, time_value: str | None = None) -> str:
-    return "\n".join(
+def _header(
+    title: str,
+    row: Any,
+    cfg: Config,
+    target: NotifyTarget,
+    time_value: str | None = None,
+    *,
+    include_chat: bool = False,
+) -> str:
+    lines = [title]
+    if include_chat:
+        chat_title = row["chat_title"] or row["chat_id"]
+        lines.append(f"💬 Чат: {_esc(chat_title)}")
+    lines.extend(
         (
-            title,
             f"👤 Отправитель: {_sender_line(row, target)}",
             f"💼 Владельцу: {_owner_line(target)}",
             _type_line(row),
             f"🕐 {_format_time(time_value or row['date'], cfg)}",
         )
     )
+    return "\n".join(lines)
 
 
 async def _send(bot: Bot, cfg: Config, target: NotifyTarget, text: str) -> None:
@@ -205,7 +217,7 @@ async def _send(bot: Bot, cfg: Config, target: NotifyTarget, text: str) -> None:
 
 
 async def notify_deleted(bot: Bot, cfg: Config, target: NotifyTarget, row: Any) -> None:
-    text = _header("🗑 <b>Сообщение удалено</b>", row, cfg, target) + "\n\n" + _body(row)
+    text = _header("🗑 <b>Сообщение удалено</b>", row, cfg, target, include_chat=True) + "\n\n" + _body(row)
     media_path = row["media_path"]
     if media_path and Path(media_path).is_file() and cfg.notify and target.chat_id is not None:
         media = FSInputFile(media_path, filename=row["file_name"] or Path(media_path).name)
